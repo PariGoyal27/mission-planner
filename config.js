@@ -1,18 +1,6 @@
-/* ============================================================
-   OPERATOR — MISSION PLANNER  |  app.js  (FIXED v2)
-   ============================================================
-
-   ★ PASTE YOUR API KEYS BELOW:
-
-   1. OpenWeatherMap (free): https://openweathermap.org/api
-      → Sign up → "API keys" tab → copy key
-
-   2. OpenRouteService (free): https://openrouteservice.org
-      → Sign up → Dashboard → copy key
-   ============================================================ */
-
-const WEATHER_API_KEY = "4df7be8cda082d2db5edff3d10c47478";   // ← paste here
-const ORS_API_KEY     = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjA4ODRkNDVjNjMyODQxYzBhMTY5YjY1ZDVkMTc0ZWQ4IiwiaCI6Im11cm11cjY0In0="; // ← paste here
+const WEATHER_API_KEY = "4df7be8cda082d2db5edff3d10c47478";
+const ORS_API_KEY =
+  "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjA4ODRkNDVjNjMyODQxYzBhMTY5YjY1ZDVkMTc0ZWQ4IiwiaCI6Im11cm11cjY0In0=";
 
 /* ─────────────────────────────────────────────────────────
    COST TABLE  (India realistic, 2025)
@@ -41,25 +29,25 @@ const ORS_API_KEY     = "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjA
    MISC:   ₹200   / day  / person
    ───────────────────────────────────────────────────────── */
 const COSTS = {
-  petrolPerLitre:       102,
-  carKmPerLitre:        15,
-  tollPerKm:            1.5,
-  trainSleeperPerKm:    1.2,
+  petrolPerLitre: 102,
+  carKmPerLitre: 15,
+  tollPerKm: 1.5,
+  trainSleeperPerKm: 1.2,
 
   // Flight pricing tiers: [minKm, baseFare, marginalPerKm]
   flightTiers: [
-    { min: 0,    max: 499,  base: 3200,  marginal: 2.0 },
-    { min: 500,  max: 999,  base: 5500,  marginal: 2.5 },
-    { min: 1000, max: 1999, base: 7800,  marginal: 3.0 },
+    { min: 0, max: 499, base: 3200, marginal: 2.0 },
+    { min: 500, max: 999, base: 5500, marginal: 2.5 },
+    { min: 1000, max: 1999, base: 7800, marginal: 3.0 },
     { min: 2000, max: Infinity, base: 11000, marginal: 3.5 },
   ],
-  flightTaxPerTicket:   850,   // airport tax + fuel surcharge + GST approx
-  flightVariabilityMin: 0.88,  // -12% minimum multiplier
-  flightVariabilityMax: 1.22,  // +22% maximum multiplier
+  flightTaxPerTicket: 850, // airport tax + fuel surcharge + GST approx
+  flightVariabilityMin: 0.88, // -12% minimum multiplier
+  flightVariabilityMax: 1.22, // +22% maximum multiplier
 
-  hotelPerNightPerson:  1200,
-  foodPerDayPerson:     500,
-  miscPerDayPerson:     200,
+  hotelPerNightPerson: 1200,
+  foodPerDayPerson: 500,
+  miscPerDayPerson: 200,
 };
 
 /* ─────────────────────────────────────────────────────────
@@ -74,21 +62,27 @@ const COSTS = {
    ───────────────────────────────────────────────────────── */
 const SPEED = { train: 60, flight: 700 };
 
-
-
-/* ===========================================================
+/* 
    UTILITIES
-   =========================================================== */
+    */
 function avgArr(arr) {
-  return arr.length ? arr.reduce(function(a, b) { return a + b; }, 0) / arr.length : 0;
+  return arr.length
+    ? arr.reduce(function (a, b) {
+        return a + b;
+      }, 0) / arr.length
+    : 0;
 }
 
-function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+function sleep(ms) {
+  return new Promise(function (r) {
+    setTimeout(r, ms);
+  });
+}
 
 function getDaysBetween(startDate, endDate) {
   var days = [];
-  var cur  = new Date(startDate + "T00:00:00");
-  var end  = new Date(endDate   + "T00:00:00");
+  var cur = new Date(startDate + "T00:00:00");
+  var end = new Date(endDate + "T00:00:00");
   while (cur <= end) {
     days.push(cur.toISOString().split("T")[0]);
     cur.setDate(cur.getDate() + 1);
@@ -98,7 +92,9 @@ function getDaysBetween(startDate, endDate) {
 
 function formatDateLabel(dateStr) {
   return new Date(dateStr + "T00:00:00").toLocaleDateString("en-IN", {
-    day:"2-digit", month:"short", year:"numeric"
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
   });
 }
 
