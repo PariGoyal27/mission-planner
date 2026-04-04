@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>OPERATOR — Mission Planner</title>
+  <!-- <link rel="stylesheet" href="style.css" /> -->
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+</head>
+<body>
+
+  <!-- MAIN APP -->
+  <div id="app" class="">
+
+    <!-- HEADER -->
+    <header>
+      <div class="header-left">
+        <span class="header-logo">⬡ OPERATOR</span>
+      </div>
+      <div class="header-center">
+        <span class="blink">●</span> SYSTEM ONLINE
+      </div>
+      <div class="header-right">
+        <span id="live-clock"></span>
+      </div>
+    </header>
+
+    <!-- MAIN GRID -->
+    <div class="main-grid">
+
+      <!-- LEFT PANEL: INPUT FORM -->
+      <aside class="panel panel-input">
+        <div class="panel-title">
+          <span class="panel-icon">◈</span> MISSION PARAMETERS
+        </div>
+
+        <div class="form-group">
+          <label>ORIGIN POINT</label>
+          <input type="text" id="origin" placeholder="e.g. New Delhi" />
+        </div>
+
+        <div class="form-group">
+          <label>TARGET CITY</label>
+          <input type="text" id="destination" placeholder="e.g. Mumbai" />
+        </div>
+
+        <div class="form-group">
+          <label>DEPARTURE DATE</label>
+          <input type="date" id="start-date" />
+        </div>
+
+        <div class="form-group">
+          <label>RETURN DATE</label>
+          <input type="date" id="end-date" />
+        </div>
+
+        <div class="form-group">
+          <label>TRANSPORT MODE</label>
+          <div class="radio-group">
+            <label class="radio-opt">
+              <input type="radio" name="transport" value="car" checked /> CAR
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="transport" value="train" /> TRAIN
+            </label>
+            <label class="radio-opt">
+              <input type="radio" name="transport" value="flight" /> FLIGHT
+            </label>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>BUDGET LIMIT (₹)</label>
+          <input type="number" id="budget" placeholder="e.g. 15000" />
+        </div>
+
+        <div class="form-group">
+          <label>TEAM SIZE</label>
+          <input type="number" id="team-size" value="1" min="1" max="20" />
+        </div>
+
+        <button id="launch-btn" onclick="launchMission()">
+          <span id="btn-text">◉ INITIATE MISSION</span>
+          <span id="btn-loader" class="hidden">⟳ PROCESSING...</span>
+        </button>
+
+        <div id="error-box" class="error-box hidden"></div>
+
+        <div class="panel-title mt-20">
+          <span class="panel-icon">◈</span> AGENT STATUS
+        </div>
+        <div class="agent-status-list">
+          <div class="agent-row" id="agent-weather">
+            <span class="agent-dot dot-idle"></span>
+            <span>Weather Agent</span>
+            <span class="agent-state">IDLE</span>
+          </div>
+          <div class="agent-row" id="agent-maps">
+            <span class="agent-dot dot-idle"></span>
+            <span>Maps Agent</span>
+            <span class="agent-state">IDLE</span>
+          </div>
+          <div class="agent-row" id="agent-budget">
+            <span class="agent-dot dot-idle"></span>
+            <span>Budget Agent</span>
+            <span class="agent-state">IDLE</span>
+          </div>
+          <div class="agent-row" id="agent-plan">
+            <span class="agent-dot dot-idle"></span>
+            <span>Plan Generator</span>
+            <span class="agent-state">IDLE</span>
+          </div>
+        </div>
+
+        <div class="panel-title mt-20">
+          <span class="panel-icon">◈</span> MISSION LOG
+        </div>
+        <div class="mission-log" id="mission-log">
+          <div class="log-line">[ SYSTEM ] Awaiting mission parameters...</div>
+        </div>
+      </aside>
+
+      <!-- RIGHT PANEL: OUTPUT -->
+      <main class="panel-output">
+
+        <!-- PLACEHOLDER -->
+        <div class="placeholder" id="placeholder">
+          <div class="placeholder-icon">◎</div>
+          <div class="placeholder-text">AWAITING MISSION BRIEF</div>
+          <div class="placeholder-sub">Fill in parameters and initiate mission</div>
+        </div>
+
+        <!-- OUTPUT SECTIONS (hidden until data arrives) -->
+        <div id="output-sections" class="hidden">
+
+          <!-- TOP STAT BAR -->
+          <div class="stat-bar">
+            <div class="stat-item">
+              <div class="stat-label">DISTANCE</div>
+              <div class="stat-value" id="stat-distance">—</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">TRAVEL TIME</div>
+              <div class="stat-value" id="stat-time">—</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">MISSION DAYS</div>
+              <div class="stat-value" id="stat-days">—</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">TOTAL COST</div>
+              <div class="stat-value" id="stat-cost">—</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-label">THREAT LEVEL</div>
+              <div class="stat-value" id="stat-threat">—</div>
+            </div>
+          </div>
+
+          <!-- CARDS ROW -->
+          <div class="cards-row">
+
+            <!-- WEATHER CARD -->
+            <div class="card card-weather" id="weather-card">
+              <div class="card-header">
+                <span class="card-icon">◈</span> WEATHER INTEL
+                <span class="card-badge" id="weather-badge"></span>
+              </div>
+              <div class="card-body" id="weather-body"></div>
+            </div>
+
+            <!-- ROUTE CARD -->
+            <div class="card card-route" id="route-card">
+              <div class="card-header">
+                <span class="card-icon">◈</span> ROUTE ANALYSIS
+              </div>
+              <div class="card-body" id="route-body"></div>
+            </div>
+
+            <!-- BUDGET CARD -->
+            <div class="card card-budget" id="budget-card">
+              <div class="card-header">
+                <span class="card-icon">◈</span> BUDGET BREAKDOWN
+                <span class="card-badge" id="budget-badge"></span>
+              </div>
+              <div class="card-body" id="budget-body"></div>
+            </div>
+
+          </div>
+
+          <!-- ALERT BOX (edge cases) -->
+          <div id="alert-box" class="alert-box hidden"></div>
+
+          <!-- OPERATION SUMMARY CARD -->
+          <div class="card card-summary">
+            <div class="card-header">
+              <span class="card-icon">◉</span> OPERATION SUMMARY CARD
+            </div>
+            <div class="card-body" id="summary-body"></div>
+          </div>
+
+          <!-- MISSION PLAN -->
+          <div class="card card-plan">
+            <div class="card-header">
+              <span class="card-icon">◉</span> STEP-BY-STEP MISSION PLAN
+              <span class="card-badge">CLASSIFIED</span>
+            </div>
+            <div class="card-body" id="plan-body"></div>
+          </div>
+
+        </div>
+      </main>
+    </div>
+
+    <!-- FOOTER -->
+    <footer>
+      <span>OPERATOR TACTICAL SYSTEMS</span>
+      <span>&copy; RHOMBUS</span>
+      <span>ALL DATA ENCRYPTED — CLEARANCE LEVEL 5</span>
+      <!-- <span id="footer-coords">LAT: 28.6139° N | LONG: 77.2090° E</span> -->
+    </footer>
+
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
