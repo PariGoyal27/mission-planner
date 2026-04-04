@@ -1,0 +1,171 @@
+/* ============================================
+   OPERATOR — MISSION PLANNER (SIMPLIFIED)
+   ============================================ */
+
+:root {
+  --bg: #080b0f;
+  --panel: #0c1219;
+  --border: #1e3a2f;
+  --green: #00ff87;
+  --amber: #ffb300;
+  --red: #ff3c3c;
+  --text: #c8d8c0;
+  --text-dim: #6a8a6a;
+  --mono: 'Share Tech Mono', monospace;
+  --head: 'Barlow Condensed', sans-serif;
+}
+
+/* Global Resets */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Layout */
+header {
+  background: var(--panel);
+  border-bottom: 2px solid var(--border);
+  padding: 10px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.header-logo {
+  font-family: var(--head);
+  color: var(--green);
+  letter-spacing: 3px;
+  font-weight: 900;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 300px 1fr;
+  min-height: 90vh;
+}
+
+/* Sidebar Panel */
+.panel {
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+}
+
+.panel-title {
+  font-family: var(--head);
+  color: var(--green);
+  text-transform: uppercase;
+  margin-bottom: 15px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* Form Elements */
+.form-group { margin-bottom: 15px; }
+
+label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+input {
+  width: 100%;
+  padding: 8px;
+  background: #0d1117;
+  border: 1px solid var(--border);
+  color: white;
+  font-family: var(--mono);
+}
+
+#launch-btn {
+  width: 100%;
+  padding: 12px;
+  background: #003d20;
+  color: var(--green);
+  border: 1px solid var(--green);
+  font-family: var(--head);
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+}
+
+#launch-btn:hover { background: var(--green); color: black; }
+
+/* Dashboard Cards */
+.panel-output { padding: 20px; background: #0d1117; }
+
+.stat-bar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.stat-item {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  padding: 15px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 20px;
+  font-weight: bold;
+  color: var(--green);
+}
+
+.cards-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.card-header {
+  padding: 10px;
+  background: #111820;
+  border-bottom: 1px solid var(--border);
+  font-weight: bold;
+  color: var(--green);
+}
+
+.card-body { padding: 15px; }
+
+/* Mission Plan Items */
+.plan-task {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  padding: 8px;
+  margin-bottom: 5px;
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.plan-task-time { color: var(--amber); margin-right: 10px; }
+
+/* Status Dots */
+.agent-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+.dot-done { background: var(--green); box-shadow: 0 0 5px var(--green); }
+.dot-running { background: var(--amber); }
+
+/* Utility Classes */
+.hidden { display: none; }
+.red { color: var(--red); }
+.green { color: var(--green); }
