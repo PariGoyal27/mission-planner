@@ -781,3 +781,158 @@ footer {
   .stat-bar { grid-template-columns: repeat(3, 1fr); }
   .summary-grid { grid-template-columns: 1fr 1fr; }
 }
+
+
+/* ============================================================
+   INTEREST SELECTOR — new addition
+   ============================================================ */
+
+.interest-hint {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.interest-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.interest-opt {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.5px;
+  color: var(--text-dim);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  padding: 5px 7px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  user-select: none;
+}
+
+.interest-opt:hover {
+  border-color: var(--border2);
+  color: var(--text);
+}
+
+.interest-opt input[type="checkbox"] {
+  accent-color: var(--green);
+  width: 11px;
+  height: 11px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.interest-opt:has(input:checked) {
+  border-color: var(--green-dim);
+  color: var(--green);
+  background: rgba(0, 204, 106, 0.06);
+}
+
+/* ============================================================
+   SMART PLACES CARD — new addition
+   ============================================================ */
+
+.card-places { animation-delay: 0.35s; margin-bottom: 12px; }
+
+/* Day group header inside places card */
+.places-day-group {
+  margin-bottom: 14px;
+}
+
+.places-day-header {
+  font-family: var(--head);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--green-dim);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 5px;
+  margin-bottom: 8px;
+}
+
+/* Individual place row */
+.place-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 6px;
+  padding: 7px 10px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  margin-bottom: 5px;
+  animation: fadeIn 0.3s ease both;
+}
+
+.place-info { min-width: 0; }
+
+.place-name {
+  font-family: var(--head);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-bright);
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.place-meta {
+  font-family: var(--mono);
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+  margin-top: 2px;
+  line-height: 1.6;
+}
+
+.place-time-badge {
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--amber);
+  border: 1px solid var(--amber-dim);
+  padding: 2px 6px;
+  white-space: nowrap;
+  align-self: center;
+  background: rgba(255,179,0,0.04);
+}
+
+/* Star rating */
+.place-stars {
+  color: var(--amber);
+  font-size: 10px;
+  letter-spacing: 1px;
+}
+
+/* No-interests fallback notice */
+.places-empty {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  padding: 20px;
+  letter-spacing: 1px;
+}
+
+/* indoor/outdoor tag on place rows */
+.place-tag {
+  font-family: var(--mono);
+  font-size: 8px;
+  letter-spacing: 1.5px;
+  padding: 1px 5px;
+  border-radius: 2px;
+  display: inline-block;
+  margin-top: 3px;
+}
+.place-tag.indoor  { color: var(--blue); border: 1px solid rgba(0,191,255,0.3); background: rgba(0,191,255,0.05); }
+.place-tag.outdoor { color: var(--green-dim); border: 1px solid var(--border); background: var(--bg3); }

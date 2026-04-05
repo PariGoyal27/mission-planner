@@ -235,23 +235,27 @@ async function launchMission() {
   var teamSize  = parseInt(document.getElementById("team-size").value) || 1;
   var numDays   = getDaysBetween(startDate, endDate).length;
 
+  /* ── Collect selected interests ── */
+  var interests = Array.from(
+    document.querySelectorAll("input[name='interest']:checked")
+  ).map(function(cb) { return cb.value; });
+
   var btn = document.getElementById("launch-btn");
   btn.disabled = true;
   document.getElementById("btn-text").classList.add("hidden");
   document.getElementById("btn-loader").classList.remove("hidden");
   document.getElementById("placeholder").classList.add("hidden");
   document.getElementById("output-sections").classList.add("hidden");
-  clearApiError(); // remove any error card from a previous failed run
-  ["weather","maps","budget","plan"].forEach(function(a) { setAgent(a, "idle"); });
+  clearApiError();
+  ["weather","maps","budget","places","plan"].forEach(function(a) { setAgent(a, "idle"); });
 
   addLog("[ SYS ] ══ MISSION INITIATED ══");
   addLog("[ SYS ] " + origin + " → " + dest + " | " + mode.toUpperCase() + " | " + numDays + " day(s) | " + teamSize + " operative(s)");
-  if (budget > 0) addLog("[ SYS ] Budget: ₹" + budget.toLocaleString("en-IN"));
+  if (budget > 0)         addLog("[ SYS ] Budget: ₹" + budget.toLocaleString("en-IN"));
+  if (interests.length)   addLog("[ SYS ] Interests: " + interests.join(", "));
 
   try {
-    // Weather and Maps run in parallel for speed.
-    // If mapsAgent throws (bad key, city not found), Promise.all rejects immediately
-    // and we land in the catch block — no partial results are rendered.
+    /* Weather + Maps run in parallel */
     addLog("[ SYS ] Deploying Weather + Maps agents in parallel...");
     var results = await Promise.all([
       weatherAgent(dest, startDate, endDate),
@@ -260,13 +264,20 @@ async function launchMission() {
     var weatherDays = results[0];
     var routeData   = results[1];
 
-    // budgetAgent now receives the full routeData object (not just distanceKm)
-    // so it can independently access aerialDistanceKm vs roadDistanceKm per mode.
     var budgetData  = await budgetAgent(routeData, teamSize, numDays, budget);
-    var missionPlan = await planGeneratorAgent(origin, dest, weatherDays, routeData, budgetData, startDate, endDate, teamSize);
-    var alerts      = detectEdgeCases(weatherDays, budgetData, routeData, numDays);
 
-    renderAll(weatherDays, routeData, budgetData, missionPlan, alerts, origin, dest, numDays, teamSize, startDate, endDate);
+    /* ── Places agent — runs after budget, non-blocking ── */
+    var placesData  = await placesAgent(dest, interests);
+
+    var missionPlan = await planGeneratorAgent(
+      origin, dest, weatherDays, routeData, budgetData,
+      startDate, endDate, teamSize, placesData
+    );
+    var alerts = detectEdgeCases(weatherDays, budgetData, routeData, numDays);
+
+    renderAll(weatherDays, routeData, budgetData, missionPlan, alerts,
+              placesData, interests,
+              origin, dest, numDays, teamSize, startDate, endDate);
     addLog("[ SYS ] ══ ALL COMPLETE — MISSION PLAN READY ══", "log-ok");
 
   } catch (err) {
@@ -289,7 +300,7 @@ async function launchMission() {
    */
 var _weatherGlobal = [];
 
-function renderAll(weatherDays, routeData, budgetData, missionPlan, alerts, origin, dest, numDays, teamSize, startDate, endDate) {
+function renderAll(weatherDays, routeData, budgetData, missionPlan, alerts, placesData, interests, origin, dest, numDays, teamSize, startDate, endDate) {
   _weatherGlobal = weatherDays;
   document.getElementById("output-sections").classList.remove("hidden");
   renderStatBar(routeData, numDays, budgetData, weatherDays);
@@ -297,6 +308,7 @@ function renderAll(weatherDays, routeData, budgetData, missionPlan, alerts, orig
   renderRouteCard(routeData);
   renderBudgetCard(budgetData);
   renderAlerts(alerts);
+  renderPlacesCard(placesData, interests);   /* NEW */
   renderSummaryCard(weatherDays, routeData, budgetData, origin, dest, numDays, teamSize, startDate, endDate);
   renderMissionPlan(missionPlan);
 }
@@ -488,4 +500,77 @@ function renderMissionPlan(missionPlan) {
   });
   html += "</div>";
   document.getElementById("plan-body").innerHTML = html;
+}
+
+/* ============================================================
+   RENDER: SMART PLACES CARD  — new addition
+   ============================================================ */
+function renderPlacesCard(places, interests) {
+  var card  = document.getElementById("places-card");
+  var body  = document.getElementById("places-body");
+  var badge = document.getElementById("places-badge");
+
+  /* Hide card if no interests were selected */
+  if (!interests || interests.length === 0 || !places || places.length === 0) {
+    card.classList.add("hidden");
+    return;
+  }
+
+  card.classList.remove("hidden");
+  badge.textContent = places.length + " PLACES";
+
+  /* Group places by dayAssigned */
+  var byDay = {};
+  places.forEach(function(p) {
+    var key = p.dayAssigned || 0;
+    if (!byDay[key]) byDay[key] = [];
+    byDay[key].push(p);
+  });
+
+  /* Star renderer — OTM rate is 0–3, display as 0–5 ★ */
+  function stars(rate) {
+    var normalized = Math.round((rate / 3) * 5);
+    var out = "";
+    for (var s = 0; s < 5; s++) out += s < normalized ? "★" : "☆";
+    return out;
+  }
+
+  var html = "";
+  var sortedDays = Object.keys(byDay).map(Number).sort(function(a,b){return a-b;});
+
+  sortedDays.forEach(function(dayNum) {
+    var dayPlaces = byDay[dayNum];
+    var header = dayNum > 0 ? "DAY " + dayNum + " — SUGGESTED VISITS" : "UNSCHEDULED";
+
+    html += "<div class='places-day-group'>"
+      + "<div class='places-day-header'>" + header + "</div>";
+
+    /* Sort within the day by bestTime: Morning → Afternoon → Evening → Anytime */
+    var timeOrder = { Morning: 0, Afternoon: 1, Evening: 2, Anytime: 3 };
+    dayPlaces.sort(function(a, b) {
+      return (timeOrder[a.bestTime] || 3) - (timeOrder[b.bestTime] || 3);
+    });
+
+    dayPlaces.forEach(function(p) {
+      var tagCls  = p.isIndoor ? "indoor" : "outdoor";
+      var tagText = p.isIndoor ? "INDOOR" : "OUTDOOR";
+
+      html += "<div class='place-row'>"
+        + "<div class='place-info'>"
+        + "<div class='place-name'>" + p.emoji + " " + p.name + "</div>"
+        + "<div class='place-meta'>"
+        + "<span class='place-stars'>" + stars(p.rating) + "</span>"
+        + "  " + p.category.toUpperCase()
+        + (p.address && p.address !== p.name ? " &nbsp;·&nbsp; " + p.address : "")
+        + "</div>"
+        + "<span class='place-tag " + tagCls + "'>" + tagText + "</span>"
+        + "</div>"
+        + "<div class='place-time-badge'>" + p.bestTime.toUpperCase() + "</div>"
+        + "</div>";
+    });
+
+    html += "</div>";
+  });
+
+  body.innerHTML = html;
 }
