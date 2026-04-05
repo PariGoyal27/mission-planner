@@ -698,13 +698,53 @@ async function planGeneratorAgent(
   startDate,
   endDate,
   teamSize,
+  places,           /* NEW — array from placesAgent, may be [] */
 ) {
   setAgent("plan", "running");
   addLog("[ PLAN ] Building step-by-step mission plan...");
   await sleep(400);
 
+  /* ── Distribute places across non-travel days ─────────────
+     Day 0 (first) and last day are mostly travel days, so we
+     assign places starting from day 1 (idx ≥ 1 up to last-1).
+     We split the places list evenly across those middle days,
+     preferring indoor venues on hazardous-weather days.
+  ───────────────────────────────────────────────────────── */
+  places = places || [];
   var days = getDaysBetween(startDate, endDate);
   var plan = [];
+
+  /* Build per-day place pools — distribute evenly */
+  var placePools = {};            // dayIndex → [place, ...]
+  if (places.length > 0 && days.length > 0) {
+    /* Middle days = not first, not last (or all if 1-2 day trip) */
+    var middleIdxs = [];
+    for (var mi = 0; mi < days.length; mi++) {
+      /* Always include days except the very first (travel day) when trip > 1 day */
+      if (days.length === 1 || mi > 0) middleIdxs.push(mi);
+    }
+    /* On hazardous days prefer indoor; sort places so indoor come first for those */
+    var weatherMap = {};
+    weatherDays.forEach(function(w) { weatherMap[w.date] = w; });
+
+    var placesLeft = places.slice(); // copy
+    var poolSize = Math.ceil(placesLeft.length / (middleIdxs.length || 1));
+
+    middleIdxs.forEach(function(dayIdx, pIdx) {
+      var dayDate = days[dayIdx];
+      var wx = weatherMap[dayDate];
+      var isHaz = wx && wx.isHazardous;
+      /* On hazardous days, prefer indoor places */
+      if (isHaz) {
+        placesLeft.sort(function(a, b) {
+          return (b.isIndoor ? 1 : 0) - (a.isIndoor ? 1 : 0);
+        });
+      }
+      var chunk = placesLeft.splice(0, Math.min(poolSize, 4)); // max 4 places/day
+      chunk.forEach(function(p) { p.dayAssigned = dayIdx + 1; });
+      if (chunk.length > 0) placePools[dayIdx] = chunk;
+    });
+  }
 
   var departurePoint =
     routeData.mode === "flight"
@@ -927,31 +967,72 @@ async function planGeneratorAgent(
           " food today.",
         type: "",
       });
-      tasks.push({
-        time: "09:00",
-        text: "Field operations. Zone 1 — document all movement and activity.",
-        type: "",
-      });
-      tasks.push({
-        time: "12:00",
-        text: "Midday break. Secure equipment. Rest.",
-        type: "",
-      });
-      tasks.push({
-        time: "13:30",
-        text: "Zone 2 operations. Photography, measurements, contact tracking.",
-        type: "",
-      });
-      tasks.push({
-        time: "17:00",
-        text: "Return to base. Secure all data. Equipment maintenance.",
-        type: "",
-      });
-      tasks.push({
-        time: "19:00",
-        text: "Day " + dayNum + " debrief. Compile report. Transmit to HQ.",
-        type: "",
-      });
+
+      /* ── Inject place visits if we have them for this day ── */
+      var dayPlaces = placePools[idx] || [];
+      if (dayPlaces.length > 0) {
+        /* Slot times: morning → afternoon → evening */
+        var timeSlots = { "Morning": "09:00", "Afternoon": "13:00", "Evening": "17:30", "Anytime": "11:00" };
+        var grouped = { Morning: [], Afternoon: [], Evening: [], Anytime: [] };
+        dayPlaces.forEach(function(p) { (grouped[p.bestTime] || grouped.Anytime).push(p); });
+
+        Object.keys(grouped).forEach(function(slot) {
+          grouped[slot].forEach(function(p) {
+            var tag = p.isIndoor ? "[INDOOR]" : "[OUTDOOR]";
+            if (weather && weather.isHazardous && !p.isIndoor) {
+              tasks.push({
+                time: timeSlots[slot] || "10:00",
+                text: "⚠ " + p.emoji + " " + p.name + " (OUTDOOR — check conditions before visiting)",
+                type: "warn",
+              });
+            } else {
+              tasks.push({
+                time: timeSlots[slot] || "10:00",
+                text: p.emoji + " Visit: " + p.name + " " + tag + " — " + p.category,
+                type: "",
+              });
+            }
+          });
+        });
+
+        tasks.push({
+          time: "12:00",
+          text: "Midday break. Lunch. Secure equipment.",
+          type: "",
+        });
+        tasks.push({
+          time: "19:00",
+          text: "Day " + dayNum + " debrief. Compile intel. Transmit to HQ.",
+          type: "",
+        });
+      } else {
+        /* No places — keep original generic tasks */
+        tasks.push({
+          time: "09:00",
+          text: "Field operations. Zone 1 — document all movement and activity.",
+          type: "",
+        });
+        tasks.push({
+          time: "12:00",
+          text: "Midday break. Secure equipment. Rest.",
+          type: "",
+        });
+        tasks.push({
+          time: "13:30",
+          text: "Zone 2 operations. Photography, measurements, contact tracking.",
+          type: "",
+        });
+        tasks.push({
+          time: "17:00",
+          text: "Return to base. Secure all data. Equipment maintenance.",
+          type: "",
+        });
+        tasks.push({
+          time: "19:00",
+          text: "Day " + dayNum + " debrief. Compile report. Transmit to HQ.",
+          type: "",
+        });
+      }
     }
 
     var dotColor =
@@ -969,4 +1050,227 @@ async function planGeneratorAgent(
   setAgent("plan", "done");
   addLog("[ PLAN ] ✓ Plan complete: " + plan.length + " day(s).", "log-ok");
   return plan;
+}
+
+
+/* ============================================================
+   AGENT 5: PLACES AGENT
+   ────────────────────────────────────────────────────────────
+   Uses OpenTripMap API (free, no key needed for basic use).
+   Endpoint: https://api.opentripmap.com/0.1/en/places/...
+
+   Flow:
+     1. Geocode city → lat/lng via OpenTripMap geoname search
+     2. For each selected interest → map to OTM kinds category
+     3. Fetch up to 15 places per category within 20km radius
+     4. Deduplicate by name, sort by rating desc
+     5. Return flat array of structured place objects
+
+   Fallback: if API fails or returns nothing → use curated
+   mock data so the plan still generates with place tasks.
+   ============================================================ */
+
+/* Interest → OpenTripMap "kinds" category mapping */
+var INTEREST_TO_KINDS = {
+  historical: "historic,fortifications,monuments_and_memorials",
+  museum:     "museums",
+  art:        "art_galleries",
+  music:      "music",
+  adventure:  "amusements,sport,outdoor_activities",
+  zoo:        "zoos_and_aquariums",
+  food:       "foods,restaurants,cafes",
+  shopping:   "shops,markets",
+  mall:       "malls",
+  movies:     "cinemas",
+  hotel:      "tourist_facilities,hotels",
+};
+
+/* Whether a category is considered indoor (for weather matching) */
+var INDOOR_KINDS = {
+  museum: true, art: true, music: true, mall: true,
+  movies: true, hotel: true, shopping: true,
+};
+
+/* Best visit time per interest */
+var BEST_TIME = {
+  historical: "Morning",  museum:   "Morning",  art:      "Morning",
+  music:      "Evening",  adventure:"Afternoon", zoo:      "Morning",
+  food:       "Evening",  shopping: "Afternoon", mall:     "Afternoon",
+  movies:     "Evening",  hotel:    "Anytime",
+};
+
+/* Emoji per interest */
+var INTEREST_EMOJI = {
+  historical:"🏛", museum:"🖼", art:"🎨", music:"🎵",
+  adventure:"🧗",  zoo:"🦁",   food:"🍛", shopping:"🛍",
+  mall:"🏬",       movies:"🎬", hotel:"🏨",
+};
+
+/* OpenTripMap free API key — public demo key, rate-limited but works */
+var OTM_API_KEY = "5ae2e3f221c38a28845f05b6898dc461bc98a83e6bdb9f7e9ee83017";
+
+async function placesAgent(city, interests) {
+  setAgent("places", "running");
+  addLog("[ PLACES ] Fetching attractions for: " + city + " (" + interests.join(", ") + ")...");
+
+  if (!interests || interests.length === 0) {
+    setAgent("places", "done");
+    addLog("[ PLACES ] No interests selected — skipping.", "log-warn");
+    return [];
+  }
+
+  try {
+    /* ── Step 1: Geocode city via OTM ── */
+    var geoUrl = "https://api.opentripmap.com/0.1/en/places/geoname"
+      + "?name=" + encodeURIComponent(city)
+      + "&apikey=" + OTM_API_KEY;
+    var geoRes = await fetch(geoUrl);
+    if (!geoRes.ok) throw new Error("OTM geocode HTTP " + geoRes.status);
+    var geoData = await geoRes.json();
+    if (!geoData.lat) throw new Error("City not found in OTM: " + city);
+
+    var lat = geoData.lat;
+    var lon = geoData.lon;
+    addLog("[ PLACES ] City located: " + lat.toFixed(3) + ", " + lon.toFixed(3));
+
+    /* ── Step 2: Fetch places per interest ── */
+    var allPlaces = [];
+    var seenNames = {};
+
+    for (var i = 0; i < interests.length; i++) {
+      var interest = interests[i];
+      var kinds    = INTEREST_TO_KINDS[interest] || interest;
+
+      try {
+        var placesUrl = "https://api.opentripmap.com/0.1/en/places/radius"
+          + "?radius=20000"                       // 20 km radius
+          + "&lon=" + lon
+          + "&lat=" + lat
+          + "&kinds=" + encodeURIComponent(kinds)
+          + "&limit=15"
+          + "&rate=2"                             // minimum rating filter (0-3 scale)
+          + "&format=json"
+          + "&apikey=" + OTM_API_KEY;
+
+        var placesRes = await fetch(placesUrl);
+        if (!placesRes.ok) continue;
+        var placesData = await placesRes.json();
+
+        if (!Array.isArray(placesData) || placesData.length === 0) continue;
+
+        placesData.forEach(function(p) {
+          if (!p.name || p.name.trim() === "") return;  // skip unnamed
+          var nameKey = p.name.trim().toLowerCase();
+          if (seenNames[nameKey]) return;               // deduplicate
+          seenNames[nameKey] = true;
+
+          allPlaces.push({
+            name:     p.name.trim(),
+            category: interest,
+            rating:   p.rate || 0,           // OTM rate: 0–3
+            address:  p.address || city,
+            isIndoor: !!INDOOR_KINDS[interest],
+            bestTime: BEST_TIME[interest] || "Anytime",
+            emoji:    INTEREST_EMOJI[interest] || "📍",
+            dayAssigned: null,               // filled by planner
+          });
+        });
+
+        addLog("[ PLACES ] " + interest + ": " + placesData.length + " found.");
+      } catch (innerErr) {
+        addLog("[ PLACES ] " + interest + " fetch failed — skipping.", "log-warn");
+      }
+    }
+
+    /* ── Step 3: Sort by rating desc, cap at 30 total ── */
+    allPlaces.sort(function(a, b) { return b.rating - a.rating; });
+    allPlaces = allPlaces.slice(0, 30);
+
+    if (allPlaces.length === 0) {
+      addLog("[ PLACES ] No results from API — using curated fallback.", "log-warn");
+      allPlaces = buildMockPlaces(city, interests);
+    }
+
+    setAgent("places", "done");
+    addLog("[ PLACES ] ✓ " + allPlaces.length + " place(s) ready.", "log-ok");
+    return allPlaces;
+
+  } catch (e) {
+    setAgent("places", "error");
+    addLog("[ PLACES ] ERROR: " + e.message + " — using curated fallback.", "log-error");
+    return buildMockPlaces(city, interests);
+  }
+}
+
+/* ──────────────────────────────────────────────────────────
+   buildMockPlaces — Curated fallback so the feature always
+   works even when the API is unreachable or rate-limited.
+   ────────────────────────────────────────────────────────── */
+function buildMockPlaces(city, interests) {
+  var MOCK = {
+    historical: [
+      { name: city + " Fort",           bestTime: "Morning",   isIndoor: false },
+      { name: city + " Palace",         bestTime: "Morning",   isIndoor: false },
+      { name: "Old " + city + " City",  bestTime: "Afternoon", isIndoor: false },
+    ],
+    museum: [
+      { name: city + " State Museum",   bestTime: "Morning",   isIndoor: true },
+      { name: city + " Heritage Museum",bestTime: "Morning",   isIndoor: true },
+    ],
+    art: [
+      { name: city + " Art Gallery",    bestTime: "Morning",   isIndoor: true },
+      { name: "Modern Art Centre",      bestTime: "Afternoon", isIndoor: true },
+    ],
+    music: [
+      { name: city + " Music Academy",  bestTime: "Evening",   isIndoor: true },
+      { name: "Live Music Lounge",      bestTime: "Evening",   isIndoor: true },
+    ],
+    adventure: [
+      { name: city + " Adventure Park", bestTime: "Afternoon", isIndoor: false },
+      { name: "Outdoor Trekking Trail", bestTime: "Morning",   isIndoor: false },
+    ],
+    zoo: [
+      { name: city + " Zoological Park",bestTime: "Morning",   isIndoor: false },
+    ],
+    food: [
+      { name: city + " Food Street",    bestTime: "Evening",   isIndoor: false },
+      { name: "Local Dhaba Row",        bestTime: "Evening",   isIndoor: false },
+      { name: "Heritage Restaurant",    bestTime: "Afternoon", isIndoor: true  },
+    ],
+    shopping: [
+      { name: city + " Bazaar",         bestTime: "Afternoon", isIndoor: false },
+      { name: "Handicraft Market",      bestTime: "Afternoon", isIndoor: false },
+    ],
+    mall: [
+      { name: city + " Mall",           bestTime: "Afternoon", isIndoor: true  },
+    ],
+    movies: [
+      { name: "PVR " + city,            bestTime: "Evening",   isIndoor: true  },
+    ],
+    hotel: [
+      { name: city + " Heritage Hotel", bestTime: "Anytime",   isIndoor: true  },
+    ],
+  };
+
+  var result = [];
+  var seenNames = {};
+  interests.forEach(function(interest) {
+    var mocks = MOCK[interest] || [];
+    mocks.forEach(function(m) {
+      if (seenNames[m.name]) return;
+      seenNames[m.name] = true;
+      result.push({
+        name:       m.name,
+        category:   interest,
+        rating:     (Math.random() * 1 + 2).toFixed(1),
+        address:    city,
+        isIndoor:   m.isIndoor,
+        bestTime:   m.bestTime,
+        emoji:      INTEREST_EMOJI[interest] || "📍",
+        dayAssigned: null,
+      });
+    });
+  });
+
+  return result;
 }
