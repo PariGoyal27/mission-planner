@@ -9,7 +9,6 @@
 </head>
 <body>
 
-  
   <!-- BOOT SCREEN -->
   <div id="boot-screen">
     <div class="boot-content">
@@ -91,6 +90,26 @@
           <input type="number" id="team-size" value="1" min="1" max="20" />
         </div>
 
+        <!-- ── INTEREST SELECTOR ── -->
+        <div class="panel-title mt-20">
+          <span class="panel-icon">◈</span> INTEREST SELECTOR
+        </div>
+        <div class="interest-hint">Select interests to get smart place recommendations</div>
+        <div class="interest-grid">
+          <label class="interest-opt"><input type="checkbox" name="interest" value="historical" /> 🏛 Historical</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="museum" />    🖼 Museum</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="art" />       🎨 Art</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="music" />     🎵 Music</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="adventure" /> 🧗 Adventure</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="zoo" />       🦁 Zoo</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="food" />      🍛 Food</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="shopping" />  🛍 Shopping</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="mall" />      🏬 Mall</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="movies" />    🎬 Movies</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="hotel" />     🏨 Hotels</label>
+        </div>
+        <!-- ── END INTEREST SELECTOR ── -->
+
         <button id="launch-btn" onclick="launchMission()">
           <span id="btn-text">◉ INITIATE MISSION</span>
           <span id="btn-loader" class="hidden">⟳ PROCESSING...</span>
@@ -115,6 +134,11 @@
           <div class="agent-row" id="agent-budget">
             <span class="agent-dot dot-idle"></span>
             <span>Budget Agent</span>
+            <span class="agent-state">IDLE</span>
+          </div>
+          <div class="agent-row" id="agent-places">
+            <span class="agent-dot dot-idle"></span>
+            <span>Places Agent</span>
             <span class="agent-state">IDLE</span>
           </div>
           <div class="agent-row" id="agent-plan">
@@ -203,6 +227,15 @@
           <!-- ALERT BOX (edge cases) -->
           <div id="alert-box" class="alert-box hidden"></div>
 
+          <!-- SMART PLACES CARD — shown only when interests are selected -->
+          <div class="card card-places hidden" id="places-card">
+            <div class="card-header">
+              <span class="card-icon">◉</span> SMART PLACES MATCH
+              <span class="card-badge" id="places-badge">INTEL</span>
+            </div>
+            <div class="card-body" id="places-body"></div>
+          </div>
+
           <!-- OPERATION SUMMARY CARD -->
           <div class="card card-summary">
             <div class="card-header">
@@ -229,13 +262,12 @@
       <span>OPERATOR TACTICAL SYSTEMS</span>
       <span>&copy; RHOMBUS</span>
       <span>ALL DATA ENCRYPTED — CLEARANCE LEVEL 5</span>
-      <!-- <span id="footer-coords">LAT: 28.6139° N | LONG: 77.2090° E</span> -->
     </footer>
 
   </div>
 
   <script src="config.js"></script>
-   <script src="agents.js"></script>
-    <script src="main.js"></script>
+  <script src="agents.js"></script>
+  <script src="main.js"></script>
 </body>
 </html>
