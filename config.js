@@ -2,14 +2,14 @@ const WEATHER_API_KEY = "4df7be8cda082d2db5edff3d10c47478";
 const ORS_API_KEY =
   "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6IjA4ODRkNDVjNjMyODQxYzBhMTY5YjY1ZDVkMTc0ZWQ4IiwiaCI6Im11cm11cjY0In0=";
 
-/* ─────────────────────────────────────────────────────────
+/* ────────────────────────────────────────────────────────
    COST TABLE  (India realistic, 2025)
 
-   CAR:
+   FOR CAR:
      Fuel = (distance × 2) ÷ 15 km/L × ₹102/L
      Toll = distance × 2 × ₹1.5/km
 
-   TRAIN (Sleeper class):
+   FOR TRAIN (Sleeper class):
      Fare = distance × ₹1.2/km × persons × 2 (return)
 
    FLIGHT (uses aerial/Haversine distance, not road distance):
