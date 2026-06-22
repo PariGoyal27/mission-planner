@@ -1250,7 +1250,7 @@ var INTEREST_TO_KINDS = {
   museum:     "museums",
   art:        "art_galleries",
   music:      "music",
-  adventure:  "amusements,sport,outdoor_activities",
+  adventure:  "amusements",
   zoo:        "zoos_and_aquariums",
   food:       "foods,restaurants,cafes",
   shopping:   "shops,markets",
@@ -1281,7 +1281,19 @@ var INTEREST_EMOJI = {
 };
 
 /* OpenTripMap free API key — public demo key, rate-limited but works */
-var OTM_API_KEY = "5ae2e3f221c38a28845f05b6898dc461bc98a83e6bdb9f7e9ee83017";
+var OTM_API_KEY = "5ae2e3f221c38a28845f05b629921c1932663eca08994f721297ddcc";
+
+var CITY_ALIASES = {
+  delhi: "New Delhi, India",
+  mumbai: "Mumbai, India",
+  kolkata: "Kolkata, India",
+  chennai: "Chennai, India",
+  bangalore: "Bengaluru, India",
+  bengaluru: "Bengaluru, India",
+  hyderabad: "Hyderabad, India",
+  pune: "Pune, India",
+  prayagraj: "Prayagraj, India"
+};
 
 async function placesAgent(city, interests) {
   setAgent("places", "running");
@@ -1294,9 +1306,11 @@ async function placesAgent(city, interests) {
   }
 
   try {
+    var citySearch =
+  CITY_ALIASES[city.toLowerCase()] || city;
     /* ── Step 1: Geocode city via OTM ── */
     var geoUrl = "https://api.opentripmap.com/0.1/en/places/geoname"
-      + "?name=" + encodeURIComponent(city)
+      + "?name=" + encodeURIComponent(citySearch)
       + "&apikey=" + OTM_API_KEY;
     var geoRes = await fetch(geoUrl);
     if (!geoRes.ok) throw new Error("OTM geocode HTTP " + geoRes.status);

@@ -83,10 +83,19 @@ function getDaysBetween(startDate, endDate) {
   var days = [];
   var cur = new Date(startDate + "T00:00:00");
   var end = new Date(endDate + "T00:00:00");
+
   while (cur <= end) {
-    days.push(cur.toISOString().split("T")[0]);
+    days.push(
+      cur.getFullYear() +
+      "-" +
+      String(cur.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(cur.getDate()).padStart(2, "0")
+    );
+
     cur.setDate(cur.getDate() + 1);
   }
+
   return days;
 }
 
