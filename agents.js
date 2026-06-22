@@ -35,7 +35,19 @@ async function weatherAgent(city, startDate, endDate) {
       "&appid=" +
       WEATHER_API_KEY +
       "&units=metric";
-    var curRes = await fetch(curURL);
+    var curController = new AbortController();
+    var curTimeout = setTimeout(function () { curController.abort(); }, 10000);
+    var curRes;
+    try {
+      curRes = await fetch(curURL, { signal: curController.signal });
+    } catch (curFetchErr) {
+      if (curFetchErr.name === "AbortError") {
+        throw new Error("Weather request timed out. Check your connection and try again.");
+      }
+      throw curFetchErr;
+    } finally {
+      clearTimeout(curTimeout);
+    }
 
     if (!curRes.ok) {
       var curErr = await curRes.json().catch(function () {
@@ -72,8 +84,28 @@ async function weatherAgent(city, startDate, endDate) {
       "&appid=" +
       WEATHER_API_KEY +
       "&units=metric&cnt=40";
-    var fcRes = await fetch(fcURL);
-    var fcData = fcRes.ok ? await fcRes.json() : null;
+    var fcController = new AbortController();
+    var fcTimeout = setTimeout(function () { fcController.abort(); }, 10000);
+    var fcData = null;
+    try {
+      var fcRes = await fetch(fcURL, { signal: fcController.signal });
+      if (fcRes.ok) {
+        fcData = await fcRes.json();
+      } else {
+        addLog(
+          "[ WEATHER ] Forecast request failed (HTTP " + fcRes.status + ") — using current weather as estimate.",
+          "log-warn",
+        );
+      }
+    } catch (fcErr) {
+      var fcErrMsg = fcErr.name === "AbortError" ? "timed out" : fcErr.message;
+      addLog(
+        "[ WEATHER ] Forecast request failed (" + fcErrMsg + ") — using current weather as estimate.",
+        "log-warn",
+      );
+    } finally {
+      clearTimeout(fcTimeout);
+    }
 
     // ── Group forecast by date ──
     var startD = new Date(startDate + "T00:00:00");
@@ -269,10 +301,38 @@ async function mapsAgent(origin, destination, mode) {
         'City not found: "' + destination + '". Try a major city name.',
       );
 
-    // ── Step 2: Aerial distance (Haversine) ──
-    // Always computed from coordinates — used as flight distance,
-    // also stored so plan text can reference it.
-    var aerialKm = haversineKm(orgCoords, dstCoords);
+    // ── Step 2: Aerial distance — routed through the airport graph ──
+    // Tries Dijkstra-based multi-hop routing first (realistic layovers
+    // via airport-graph.js / route-engine.js); falls back automatically
+    // to the original Haversine straight-line distance if routing fails
+    // for any reason (AIRPORT_NOT_FOUND / NO_ROUTE_FOUND / INVALID_GRAPH).
+    var flightRoute = computeFlightDistance(
+      origin,
+      destination,
+      orgCoords,
+      dstCoords,
+    );
+    var aerialKm = flightRoute.aerialKm;
+
+    if (flightRoute.usedRouting) {
+      addLog(
+        "[ MAPS ] ✓ Routed via airport graph: " +
+          flightRoute.route.join(" → ") +
+          " (" +
+          flightRoute.layoverCount +
+          " layover" +
+          (flightRoute.layoverCount === 1 ? "" : "s") +
+          ")",
+        "log-ok",
+      );
+    } else {
+      addLog(
+        "[ MAPS ] Airport routing unavailable (" +
+          flightRoute.fallbackReason +
+          ") — using straight-line distance instead.",
+        "log-warn",
+      );
+    }
 
     // ── Step 3: Road route (car & train only) ──
     // For flight we don't need road data — skip the directions call.
@@ -368,10 +428,10 @@ async function mapsAgent(origin, destination, mode) {
       "log-ok",
     );
 
-    return {
+   return {
       distanceKm: distanceKm, // distance relevant to this mode (for cost calc)
       roadDistanceKm: roadKm, // always road km (may be null for flight if skipped)
-      aerialDistanceKm: aerialKm, // straight-line km (always present)
+      aerialDistanceKm: aerialKm, // straight-line km for car/train; routed km for flight when routing succeeds
       travelTimeHrs: travelHrs,
       drivingTimeHrs: drivingHrs, // ORS driving hrs (null for flight)
       orgCoords: orgCoords, // [lng, lat] — passed to budgetAgent for seeding
@@ -379,6 +439,13 @@ async function mapsAgent(origin, destination, mode) {
       origin: origin,
       destination: destination,
       mode: mode,
+      // ── Existing routing fields ──
+      flightRoute: mode === "flight" ? flightRoute.route : null, // ordered IATA codes, or null
+      flightLayoverCount: mode === "flight" ? flightRoute.layoverCount : 0,
+      flightUsedRouting: mode === "flight" ? flightRoute.usedRouting : false,
+      // ── New, optional — safe to ignore by any consumer that doesn't know about them ──
+      fallbackReason: mode === "flight" ? flightRoute.fallbackReason : null, // AIRPORT_NOT_FOUND / NO_ROUTE_FOUND / INVALID_GRAPH / null
+      haversineDistanceKm: mode === "flight" ? haversineKm(orgCoords, dstCoords) : null, // plain straight-line km, always present for flight, for comparison even when routing succeeded
     };
   } catch (e) {
     setAgent("maps", "error");
@@ -453,6 +520,113 @@ function haversineKm(coordA, coordB) {
 
 function toRad(deg) {
   return deg * (Math.PI / 180);
+}
+/* ──────────────────────────────────────────────────────────
+   computeFlightDistance — Routes a flight leg through the
+   airport graph (airport-graph.js + route-engine.js) to get a
+   realistic multi-hop distance instead of a raw straight line.
+
+   Falls back automatically to the original Haversine distance
+   if anything in the routing pipeline fails:
+     - AIRPORT_NOT_FOUND  → origin/destination has no nearby airport
+     - NO_ROUTE_FOUND     → airports exist but graph has no path
+     - INVALID_GRAPH      → graph build/validation failed
+     - any unexpected exception (defensive catch-all)
+
+   Requires (already loaded via index.html, before agents.js):
+     airports-data.js  → AIRPORTS
+     airport-utils.js  → findAirportByCity, findNearestAirport
+     airport-graph.js  → buildAirportGraph, validateGraph
+     route-engine.js   → findBestRoute
+
+   Params:
+     origin, destination → original city name strings (as typed
+                            by the user / passed into mapsAgent)
+     orgCoords, dstCoords→ [lng, lat] pairs from geocodeCity
+                            (ORS coordinate order)
+
+   Returns:
+     {
+       aerialKm: number,        // routed distance, or Haversine fallback
+       usedRouting: boolean,    // true if the airport graph was used
+       route: array | null,     // ordered IATA codes, or null on fallback
+       layoverCount: number,    // 0 when usedRouting is false
+       fallbackReason: string|null  // one of the 3 error codes, or null
+     }
+
+   This function never throws — every failure path falls back to
+   the existing Haversine calculation, so mapsAgent's behavior is
+   never worse than it was before this integration.
+   ────────────────────────────────────────────────────────── */
+function computeFlightDistance(origin, destination, orgCoords, dstCoords) {
+  // Always compute the original Haversine distance first — this is
+  // both the fallback value AND kept for comparison/logging.
+  var fallbackAerialKm = haversineKm(orgCoords, dstCoords);
+
+  var result = {
+    aerialKm: fallbackAerialKm,
+    usedRouting: false,
+    route: null,
+    layoverCount: 0,
+    fallbackReason: null,
+  };
+
+  // Guard: required routing functions/data not loaded for any reason
+  // (e.g. script tag missing/out of order) — fall back immediately.
+  if (
+    typeof findAirportByCity !== "function" ||
+    typeof findNearestAirport !== "function" ||
+    typeof findBestRoute !== "function"
+  ) {
+    result.fallbackReason = "INVALID_GRAPH";
+    return result;
+  }
+
+  try {
+    // ── Resolve origin city → airport ──
+    // Try direct city-name match first; if that fails, fall back to
+    // nearest-airport-by-coordinate (using the already-geocoded coords).
+    var originAirport = findAirportByCity(origin);
+    if (!originAirport) {
+      var nearestOrigin = findNearestAirport(orgCoords[1], orgCoords[0]); // [lng,lat] → (lat,lon)
+      originAirport = nearestOrigin ? nearestOrigin.airport : null;
+    }
+
+    // ── Resolve destination city → airport (same strategy) ──
+    var destAirport = findAirportByCity(destination);
+    if (!destAirport) {
+      var nearestDest = findNearestAirport(dstCoords[1], dstCoords[0]);
+      destAirport = nearestDest ? nearestDest.airport : null;
+    }
+
+    if (!originAirport || !destAirport) {
+      result.fallbackReason = "AIRPORT_NOT_FOUND";
+      return result;
+    }
+
+    // ── Run the route engine ──
+    var routeResult = findBestRoute(originAirport.code, destAirport.code);
+
+    if (!routeResult || !routeResult.success) {
+      // Surfaces NO_ROUTE_FOUND, INVALID_GRAPH, or AIRPORT_NOT_FOUND
+      // as reported by findBestRoute itself.
+      result.fallbackReason = (routeResult && routeResult.error) || "NO_ROUTE_FOUND";
+      return result;
+    }
+
+    // ── Success: use the routed distance ──
+    result.usedRouting = true;
+    result.aerialKm = routeResult.totalDistanceKm;
+    result.route = routeResult.route;
+    result.layoverCount = routeResult.layoverCount;
+    return result;
+  } catch (e) {
+    // Defensive catch-all — any unexpected error from the routing
+    // pipeline falls back to plain Haversine rather than breaking
+    // mapsAgent or the orchestrator.
+    result.fallbackReason = "INVALID_GRAPH";
+    return result;
+  }
 }
 
 /* 

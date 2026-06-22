@@ -341,15 +341,21 @@ function renderWeatherCard(weatherDays) {
 
   var html = "<div class='weather-grid'>";
   weatherDays.forEach(function(day) {
+    var safeEmoji = (day.emoji !== undefined && day.emoji !== null) ? day.emoji : "🌤";
+    var safeDesc  = (day.description !== undefined && day.description !== null) ? day.description : "conditions unavailable";
+    var safeTemp  = (typeof day.temp === "number") ? day.temp : "—";
+    var safeWind  = (typeof day.windSpeed === "number") ? day.windSpeed : "—";
+    var safeHum   = (typeof day.humidity === "number") ? day.humidity : "—";
+
     html += "<div class='weather-day'>"
       + "<div class='weather-date'>" + formatDateLabel(day.date)
       + (day.isEstimate ? " <span style='color:var(--amber-dim);font-size:9px'>(EST)</span>" : "")
       + "</div>"
-      + "<div class='weather-icon-text'>" + day.emoji + "</div>"
-      + "<div class='weather-desc'>" + day.description + "</div>"
-      + "<div class='weather-temp'>" + day.temp + "°C</div>"
+      + "<div class='weather-icon-text'>" + safeEmoji + "</div>"
+      + "<div class='weather-desc'>" + safeDesc + "</div>"
+      + "<div class='weather-temp'>" + safeTemp + "°C</div>"
       + "<div style='font-family:var(--mono);font-size:9px;color:var(--text-dim);margin-top:3px'>"
-      + "💨 " + day.windSpeed + " m/s &nbsp;|&nbsp; 💧 " + day.humidity + "%</div>"
+      + "💨 " + safeWind + " m/s &nbsp;|&nbsp; 💧 " + safeHum + "%</div>"
       + (day.isHazardous ? "<div class='weather-warn'>⚠ HAZARDOUS CONDITIONS</div>" : "")
       + "</div>";
   });
@@ -377,6 +383,33 @@ function renderRouteCard(r) {
     timeNote    = "live ORS road data";
   }
 
+  // ── NEW: Flight routing intel block (flight mode only). ──
+  // Backward compatible — r.flightUsedRouting etc. are undefined for
+  // car/train and for any routeData produced before this integration,
+  // so routingBlock simply stays "" and nothing renders differently.
+  var routingBlock = "";
+  if (r.mode === "flight" && typeof r.flightUsedRouting !== "undefined") {
+    if (r.flightUsedRouting) {
+      var hasComparison = typeof r.haversineDistanceKm === "number";
+      var extraKm = hasComparison ? (r.aerialDistanceKm - r.haversineDistanceKm) : null;
+
+      routingBlock =
+        row("ROUTING METHOD", "<span class='sum-value green' style='font-size:10px;padding:2px 6px;border-radius:3px;background:rgba(0,255,100,0.08)'>AIRPORT GRAPH ROUTING (DIJKSTRA)</span>")
+        + row("AIRPORT ROUTE", "<span style='letter-spacing:0.5px'>" + r.flightRoute.join(" → ") + "</span>")
+        + row("LAYOVERS", r.flightLayoverCount + (r.flightLayoverCount === 1 ? " stop" : " stops"))
+        + (hasComparison
+            ? row("ROUTED DISTANCE", r.aerialDistanceKm + " km")
+              + row("DIRECT HAVERSINE DIST.", r.haversineDistanceKm + " km")
+              + row("EXTRA DISTANCE", "<span class='sum-value " + (extraKm > 0 ? "amber" : "green") + "'>" + (extraKm >= 0 ? "+" : "") + extraKm + " km</span>")
+            : "");
+    } else {
+      routingBlock =
+        row("ROUTING METHOD", "<span class='sum-value amber' style='font-size:10px;padding:2px 6px;border-radius:3px;background:rgba(255,180,0,0.08)'>HAVERSINE FALLBACK</span>")
+        + row("ROUTING STATUS", "<span class='sum-value amber'>Routing unavailable</span>")
+        + row("REASON", "<span class='sum-value red'>" + (r.fallbackReason || "UNKNOWN") + "</span>");
+    }
+  }
+
   document.getElementById("route-body").innerHTML =
     row("FROM", r.origin.toUpperCase())
     + row("TO", r.destination.toUpperCase())
@@ -388,7 +421,8 @@ function renderRouteCard(r) {
     + (r.mode === "flight" && r.roadDistanceKm
         ? row("ROAD DIST (ref)", r.roadDistanceKm + " km by road") : "")
     + (r.mode === "train"
-        ? row("DRIVING TIME (ref)", r.drivingTimeHrs + " hrs by road") : "");
+        ? row("DRIVING TIME (ref)", r.drivingTimeHrs + " hrs by road") : "")
+    + routingBlock;
 }
 
 function row(k, v) {
@@ -449,11 +483,28 @@ function renderSummaryCard(weatherDays, routeData, budgetData, origin, dest, num
   var stCls   = budgetData.isOverBudget ? "red" : haz > 0 ? "amber" : "green";
   var mLabel  = routeData.mode === "car" ? "🚗 Car" : routeData.mode === "train" ? "🚆 Train" : "✈ Flight";
 
+  // ── NEW: Routing method summary (flight mode only). ──
+  // Backward compatible — stays "" for car/train and for any
+  // routeData that predates this integration (flightUsedRouting undefined).
+  var routingSummary = "";
+  if (routeData.mode === "flight" && typeof routeData.flightUsedRouting !== "undefined") {
+    if (routeData.flightUsedRouting) {
+      routingSummary =
+        sb("ROUTING METHOD", "AIRPORT GRAPH (DIJKSTRA)", "green")
+        + sb("LAYOVERS", routeData.flightLayoverCount, routeData.flightLayoverCount > 0 ? "amber" : "green");
+    } else {
+      routingSummary =
+        sb("ROUTING METHOD", "HAVERSINE FALLBACK", "amber")
+        + sb("FALLBACK REASON", routeData.fallbackReason || "UNKNOWN", "red");
+    }
+  }
+
   document.getElementById("summary-body").innerHTML =
     "<div class='summary-grid'>"
     + sb("MISSION STATUS", status, stCls)
     + sb("ROUTE", origin.toUpperCase() + " → " + dest.toUpperCase(), "")
     + sb("TRANSPORT", mLabel, "")
+    + routingSummary
     + sb("DURATION", numDays + " DAY(S)", "")
     + sb("TEAM", teamSize + " OPERATIVE(S)", "")
     + sb("TRAVEL TIME", routeData.travelTimeHrs + " HRS", "")
