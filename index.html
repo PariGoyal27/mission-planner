@@ -1,12 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OPERATOR — Mission Planner</title>
   <link rel="stylesheet" href="style.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;600;700;900&family=Barlow:wght@300;400;500&display=swap"
+    rel="stylesheet" />
 </head>
+
 <body>
 
   <!-- BOOT SCREEN -->
@@ -15,7 +19,9 @@
       <div class="boot-logo">OPERATOR</div>
       <div class="boot-sub">TACTICAL MISSION PLANNING SYSTEM</div>
       <div class="boot-lines" id="boot-lines"></div>
-      <div class="boot-bar-wrap"><div class="boot-bar" id="boot-bar"></div></div>
+      <div class="boot-bar-wrap">
+        <div class="boot-bar" id="boot-bar"></div>
+      </div>
       <div class="boot-status" id="boot-status">INITIALIZING...</div>
     </div>
   </div>
@@ -97,16 +103,16 @@
         <div class="interest-hint">Select interests to get smart place recommendations</div>
         <div class="interest-grid">
           <label class="interest-opt"><input type="checkbox" name="interest" value="historical" /> 🏛 Historical</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="museum" />    🖼 Museum</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="art" />       🎨 Art</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="music" />     🎵 Music</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="museum" /> 🖼 Museum</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="art" /> 🎨 Art</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="music" /> 🎵 Music</label>
           <label class="interest-opt"><input type="checkbox" name="interest" value="adventure" /> 🧗 Adventure</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="zoo" />       🦁 Zoo</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="food" />      🍛 Food</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="shopping" />  🛍 Shopping</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="mall" />      🏬 Mall</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="movies" />    🎬 Movies</label>
-          <label class="interest-opt"><input type="checkbox" name="interest" value="hotel" />     🏨 Hotels</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="zoo" /> 🦁 Zoo</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="food" /> 🍛 Food</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="shopping" /> 🛍 Shopping</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="mall" /> 🏬 Mall</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="movies" /> 🎬 Movies</label>
+          <label class="interest-opt"><input type="checkbox" name="interest" value="hotel" /> 🏨 Hotels</label>
         </div>
         <!-- ── END INTEREST SELECTOR ── -->
 
@@ -266,14 +272,15 @@
 
   </div>
 
- <script src="config.js"></script>
+  <script src="config.js"></script>
 
-<script src="flight-routing/airports-data.js"></script>
-<script src="flight-routing/airport-utils.js"></script>
-<script src="flight-routing/airport-graph.js"></script>
-<script src="flight-routing/route-engine.js"></script>
+  <script src="flight-routing/airports-data.js"></script>
+  <script src="flight-routing/airport-utils.js"></script>
+  <script src="flight-routing/airport-graph.js"></script>
+  <script src="flight-routing/route-engine.js"></script>
 
-<script src="agents.js"></script>
-<script src="main.js"></script>
+  <script src="agents.js"></script>
+  <script src="main.js"></script>
 </body>
+
 </html>
