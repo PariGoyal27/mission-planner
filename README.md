@@ -91,9 +91,9 @@ No build step needed. Open `index.html` directly in a browser, or serve it with 
 ---
 
 ## 🙌 Contributors
+- [Sneha Singh](https://github.com/snehasingh5134)
 - [Pari Goyal](https://github.com/PariGoyal27)
 - [Muskaan Kushwaha](https://github.com/muskaankushwaha)
-- [Sneha Singh](https://github.com/snehasingh5134)
 - [Nandini Sahu](https://github.com/nandinisahu2120)
 
 ---
