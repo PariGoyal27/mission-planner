@@ -74,7 +74,7 @@ No build step needed. Open `index.html` directly in a browser, or serve it with 
 ---
 
 ## 🌐 Live Demo
-> _Add your deployed link here once live, e.g._: https://parigoyal27.github.io/mission-planner/
+> https://snehasingh5134.github.io/mission-planner/
 
 ---
 
@@ -91,9 +91,9 @@ No build step needed. Open `index.html` directly in a browser, or serve it with 
 ---
 
 ## 🙌 Contributors
+- [Sneha Singh](https://github.com/snehasingh5134)
 - [Pari Goyal](https://github.com/PariGoyal27)
 - [Muskaan Kushwaha](https://github.com/muskaankushwaha)
-- [Sneha Singh](https://github.com/snehasingh5134)
 - [Nandini Sahu](https://github.com/nandinisahu2120)
 
 ---
