@@ -1,8 +1,6 @@
 # 🎯 Mission Planner
 
-A smart, multi-agent operations planning dashboard that orchestrates multiple live APIs (weather, geocoding, routing) into one clean interface — generating step-by-step plans and rough budget estimates automatically, without manual data crunching.
-
-Built as a project to demonstrate **API orchestration**, **fallback/edge-case handling**, and **clean data presentation** rather than raw AI generation — every plan is built strictly from real fetched data.
+A multi-agent trip/operations planning dashboard that orchestrates several live APIs — weather, routing, and points-of-interest — in parallel, and turns the results into a clean day-by-day plan with a cost breakdown. Every part of the final plan comes directly from real fetched data, not from AI-generated text, so there's no risk of hallucinated details.
 
 ---
 
@@ -10,24 +8,27 @@ Built as a project to demonstrate **API orchestration**, **fallback/edge-case ha
 
 | Feature | Description |
 |---|---|
-| 🌦️ **Weather Agent** | Pulls live conditions from OpenWeatherMap `/weather`, and switches to `/forecast` automatically when the trip date is more than a few days out — always shows an "estimate" flag on forecasted data. |
-| 🗺️ **Routing Agent** | Calculates the shortest / most efficient route between two points using a custom pathfinding module. |
-| 💰 **Budget Estimator (Basic)** | Gives a rough cost breakdown of travel (fuel, public transport, flights) based on distance and mode. |
-| 🧭 **Step-by-Step Guidance** | Turns raw API data into a simple day-wise plan (e.g. "Day 1: Travel to City", "Day 2: On-site tasks") in plain language. |
-| 🧩 **Agent Orchestration** | Multiple independent JS "agents" (weather, routing, budget) run and combine their data into one final plan — with fallbacks if any single API fails, so the app never breaks silently. |
-| 🖥️ **Command Center Dashboard** | All the above shown as clean, readable summary cards instead of raw JSON. |
-| ⚠️ **Edge-Case Handling** | Detects conflicting conditions (e.g. severe weather on the route) and adjusts the suggested plan instead of ignoring it. |
+| 🌦️ **Weather Agent** | Fetches current conditions and a 5-day/3-hour forecast from OpenWeatherMap. Falls back gracefully to current weather (flagged as an estimate) when the trip is more than 5 days out or the forecast call fails. |
+| 🗺️ **Maps/Routing Agent** | Geocodes both cities via OpenRouteService, fetches real road distance & driving time for car/train, and for flights routes through a custom airport graph (Dijkstra shortest-path) with an automatic Haversine straight-line fallback if routing data is unavailable. |
+| 📍 **Places Agent** | Pulls points of interest near the destination from OpenTripMap based on the traveller's selected interests, and distributes them across the itinerary's middle days — preferring indoor venues on hazardous-weather days. |
+| 💰 **Budget Agent** | Calculates a detailed cost breakdown (transport, hotel, food, misc) with mode-specific formulas — fuel + toll for car, per-km fare for train, and tiered fare pricing with deterministic demand variability for flights. |
+| 🧭 **Plan Generator Agent** | Combines all of the above into a realistic, time-stamped, day-by-day itinerary — arrival/departure logistics, place visits, and weather-aware task scheduling. |
+| ⚠️ **Edge-Case Detection** | Flags severe weather on the route, budget overruns (with mode-specific savings tips), long single-day drives, one-day trips, and short-haul flights that would be cheaper by road. |
+| 🖥️ **Command Center Dashboard** | Boot sequence, live clock, per-agent status indicators, and summary cards presenting all of the above in one readable view. |
 
 ---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** HTML5, CSS3, Vanilla JavaScript *(no framework — kept lightweight and dependency-free)*
+- **Frontend:** HTML5, CSS3, Vanilla JavaScript *(no framework — lightweight, zero build step)*
 - **APIs Used:**
-  - [OpenWeatherMap API](https://openweathermap.org/api) — current weather + 5-day/3-hour forecast
-  - Geocoding API — converts place names to coordinates
-  - Custom routing/pathfinding logic (`flight-routing` module)
-- **Architecture Pattern:** Lightweight multi-agent orchestration — each module (`agents.js`, `flight-routing/`) acts as an independent "agent" that `main.js` coordinates and merges into a single plan
+  - [OpenWeatherMap API](https://openweathermap.org/api) — current weather + 5-day forecast
+  - [OpenRouteService API](https://openrouteservice.org) — geocoding + road directions
+  - [OpenTripMap API](https://opentripmap.io) — points of interest / attractions
+- **Custom Algorithms:**
+  - Haversine formula for great-circle flight distance
+  - Dijkstra-based shortest-path routing across a custom airport graph, with automatic fallback
+- **Architecture Pattern:** Multi-agent orchestration — 5 independent async "agents" (`weatherAgent`, `mapsAgent`, `budgetAgent`, `placesAgent`, `planGeneratorAgent`) run in `agents.js`, coordinated by a single orchestrator function (`launchMission`) in `main.js`. Weather and routing run in parallel via `Promise.all` for speed; each agent has its own error handling and never silently fails.
 - **Version Control:** Git & GitHub
 - **Deployment:** GitHub Pages *(static hosting — no backend server required)*
 
@@ -37,12 +38,16 @@ Built as a project to demonstrate **API orchestration**, **fallback/edge-case ha
 
 ```
 mission-planner/
-├── flight-routing/       # Routing agent - shortest path logic
-├── agents.js             # Weather + orchestration agent logic
-├── config.js             # API keys & configuration
-├── index.html            # App structure / dashboard UI
-├── main.js               # Entry point - runs & combines all agents
-└── style.css              # Styling
+├── flight-routing/
+│   ├── airports-data.js      # Airport coordinate/IATA data
+│   ├── airport-utils.js      # City → nearest airport lookup
+│   ├── airport-graph.js      # Builds the routing graph
+│   └── route-engine.js       # Dijkstra shortest-path engine
+├── agents.js                 # All 5 agents: weather, maps, budget, places, plan
+├── config.js                 # API keys + cost/speed constants
+├── index.html                # Dashboard structure
+├── main.js                   # Orchestrator — runs & combines all agents
+└── style.css                 # Styling
 ```
 
 ---
@@ -55,17 +60,16 @@ git clone https://github.com/PariGoyal27/mission-planner.git
 cd mission-planner
 ```
 
-### 2. Add your API key
-Open `config.js` and add your own free [OpenWeatherMap API key](https://openweathermap.org/api):
+### 2. Add your API keys
+Open `config.js` and fill in:
 ```js
-const WEATHER_API_KEY = "your_api_key_here";
+const WEATHER_API_KEY = "your_openweathermap_key_here";
+const ORS_API_KEY = "your_openrouteservice_key_here";
 ```
+Both are free to obtain from [openweathermap.org/api](https://openweathermap.org/api) and [openrouteservice.org](https://openrouteservice.org). Without these, the app falls back to demo/mock data.
 
 ### 3. Run it locally
-No build step needed — just open `index.html` in your browser, or serve it with a simple local server:
-```bash
-npx serve .
-```
+No build step needed. Open `index.html` directly in a browser, or serve it with a local server (recommended, e.g. the VS Code "Live Server" extension) for auto-reload on changes.
 
 ---
 
@@ -76,11 +80,13 @@ npx serve .
 
 ## 🧠 How It Works (Short Version)
 
-1. User enters a destination and date.
-2. The **weather agent** and **routing agent** fetch data from their respective APIs at the same time.
-3. The **budget agent** uses the routing distance to estimate rough travel cost.
-4. All three results are merged by `main.js` into one **Pursuit Plan** — a simple, day-wise itinerary.
-5. If any API fails or data conflicts (e.g. a storm on the route), the app falls back gracefully and flags it instead of crashing or hallucinating a plan.
+1. User enters origin, destination, travel dates, transport mode, budget, team size, and interests.
+2. **Weather** and **Maps** agents run in parallel to fetch live conditions and route data.
+3. **Budget** agent uses the route data to calculate a detailed cost breakdown for the chosen transport mode.
+4. **Places** agent fetches points of interest matching the user's selected interests.
+5. **Plan Generator** combines everything into a day-by-day itinerary with real timestamps.
+6. **Edge-case detection** scans the combined data for hazardous weather, budget overruns, and other risk conditions, and surfaces them as alerts.
+7. If any single agent fails, the app shows a clear error for that agent instead of silently producing wrong data — the rest of the plan still generates where possible.
 
 ---
 
@@ -93,4 +99,4 @@ npx serve .
 ---
 
 ## 📌 Status
-🚧 Actively being built — core agent orchestration and weather logic are complete; budget estimator, step-by-step plan generator, and edge-case handling are in progress.
+✅ Core system complete — all 5 agents (weather, routing, budget, places, plan generation), edge-case detection, and the command-center dashboard UI are fully functional. Add API keys above to switch from demo data to live results.
